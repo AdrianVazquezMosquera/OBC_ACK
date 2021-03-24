@@ -25,6 +25,7 @@
 #include "ESAT_OBC-telecommands/ESAT_OBCEraseStoredTelemetryTelecommand.h"
 #include "ESAT_OBC-telecommands/ESAT_OBCSetTimeTelecommand.h"
 #include "ESAT_OBC-telecommands/ESAT_OBCStoreTelemetryTelecommand.h"
+#include "ESAT_OBC-telecommands/ESAT_OBCProgrammedTelecommand.h"
 #include <RAMStatistics.h>
 
 boolean ESAT_OBCACKTelemetryClass::makeAvailable(bool isAvailable)
@@ -70,7 +71,8 @@ boolean ESAT_OBCACKTelemetryClass::fillUserData(ESAT_CCSDSPacket &packet)
                      ESAT_OBCEnableTelemetryTelecommand.packetIdentifier(),
                      ESAT_OBCEraseStoredTelemetryTelecommand.packetIdentifier(),
                      ESAT_OBCSetTimeTelecommand.packetIdentifier(),
-                     ESAT_OBCStoreTelemetryTelecommand.packetIdentifier()};
+                     ESAT_OBCStoreTelemetryTelecommand.packetIdentifier(),
+                     ESAT_OBCProgrammedTelecommand.packetIdentifier()};
   for (int i = 0; i < sizeof(handlers); i++)
   {
     if (handlerIsCompatibleWithPacket(handlers[i], datum))

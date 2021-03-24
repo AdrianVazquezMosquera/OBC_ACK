@@ -27,6 +27,7 @@
 #include "ESAT_OBC-telecommands/ESAT_OBCEraseStoredTelemetryTelecommand.h"
 #include "ESAT_OBC-telecommands/ESAT_OBCSetTimeTelecommand.h"
 #include "ESAT_OBC-telecommands/ESAT_OBCStoreTelemetryTelecommand.h"
+#include "ESAT_OBC-telecommands/ESAT_OBCProgrammedTelecommand.h"
 #include "ESAT_OBC-telemetry/ESAT_OBCHousekeepingTelemetry.h"
 #include "ESAT_OBC-telemetry/ESAT_OBCLinesTelemetry.h"
 #include "ESAT_OBC-telemetry/ESAT_OBCProcessorTelemetry.h"
@@ -78,6 +79,7 @@ void ESAT_OBCSubsystemClass::beginTelecommands()
   addTelecommand(ESAT_OBCEraseStoredTelemetryTelecommand);
   addTelecommand(ESAT_OBCEnableTelemetryTelecommand);
   addTelecommand(ESAT_OBCDisableTelemetryTelecommand);
+  addTelecommand(ESAT_OBCProgrammedTelecommand);
 }
 
 void ESAT_OBCSubsystemClass::disableTelemetry(const byte identifier)

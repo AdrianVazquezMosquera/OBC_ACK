@@ -18,61 +18,58 @@
  * <http://www.gnu.org/licenses/>.
  */
 
-#include "ESAT_OBC-hardware/ESAT_TelemetryStorage.h"
+#include "ESAT_OBC-hardware/ESAT_TelecommandStorage.h"
+#include "ESAT_OBC-hardware/ESAT_OBCClock.h"
 #include <ESAT_CCSDSPacketFromKISSFrameReader.h>
 #include <ESAT_CCSDSPacketToKISSFrameWriter.h>
 
-// The filename of the telemetry archive cannot exceed 8 characters
+// The filename of the telecommand archive cannot exceed 8 characters
 // due to filesystem limitations.
-const char ESAT_TelemetryStorageClass::TELEMETRY_FILE[] = "telem_db";
+const char ESAT_TelecommandStorageClass::TELECOMMAND_FILE[] = "tlcmd_db";
 
-void ESAT_TelemetryStorageClass::beginReading(const ESAT_Timestamp begin,
-                                              const ESAT_Timestamp end)
+void ESAT_TelecommandStorageClass::beginReading()
 {
-  beginTimestamp = begin;
-  endTimestamp = end;
-  // We must open the telemetry archive in read mode.
+  // We must open the telecommand archive in read mode.
   // Close it first if it is already open.
   if (file)
   {
     file.close();
   }
-  file = SD.open(TELEMETRY_FILE, FILE_READ);
+  file = SD.open(TELECOMMAND_FILE, FILE_READ);
   readingInProgress = true;
 }
 
-void ESAT_TelemetryStorageClass::endReading()
+void ESAT_TelecommandStorageClass::endReading()
 {
-  // We must close the telemetry archive when we are finished with
+  // We must close the telecommand archive when we are finished with
   // reading it so that it can be used for a new reading session
   // or for writing new packets.
   file.close();
   readingInProgress = false;
 }
 
-void ESAT_TelemetryStorageClass::erase()
+void ESAT_TelecommandStorageClass::erase()
 {
-  // Erasing the stored telemetry is as simple as removing the
-  // telemetry archive.
-  // A failure to remove the telemetry archive is a hardware error.
-  const boolean correctRemoval = SD.remove((char*) TELEMETRY_FILE);
+  // Erasing the stored telecommand is as simple as removing the
+  // telecommand archive.
+  // A failure to remove the telecommand archive is a hardware error.
+  const boolean correctRemoval = SD.remove((char*) TELECOMMAND_FILE);
   if (!correctRemoval)
   {
     error = true;
   }
 }
 
-boolean ESAT_TelemetryStorageClass::read(ESAT_CCSDSPacket& packet)
+boolean ESAT_TelecommandStorageClass::read(ESAT_CCSDSPacket& packet)
 {
-
   // If we didn't call beginReading(), we aren't ready to read
-  // telemetry, but this in itself isn't a hardware error, so we don't
+  // telecommand, but this in itself isn't a hardware error, so we don't
   // set the error flag.
   if (!readingInProgress)
   {
     return false;
   }
-  // It is a hardware error if we couldn't open the telemetry archive.
+  // It is a hardware error if we couldn't open the telecommand archive.
   if (!file)
   {
     error = true;
@@ -96,9 +93,11 @@ boolean ESAT_TelemetryStorageClass::read(ESAT_CCSDSPacket& packet)
     packet.rewind();
     const ESAT_CCSDSSecondaryHeader secondaryHeader =
       packet.readSecondaryHeader();
+    const bool isProgrammed = packet.readBoolean();
+    const ESAT_Timestamp timestamp = packet.readTimestamp();
+    const ESAT_Timestamp currentTime = ESAT_OBCClock.read();
     packet.rewind();
-    if ((beginTimestamp <= secondaryHeader.timestamp)
-        && (secondaryHeader.timestamp <= endTimestamp))
+    if (isProgrammed && (timestamp < currentTime))
     {
       return true;
     }
@@ -106,12 +105,12 @@ boolean ESAT_TelemetryStorageClass::read(ESAT_CCSDSPacket& packet)
   return false;
 }
 
-boolean ESAT_TelemetryStorageClass::reading() const
+boolean ESAT_TelecommandStorageClass::reading() const
 {
   return readingInProgress;
 }
 
-unsigned long ESAT_TelemetryStorageClass::size()
+unsigned long ESAT_TelecommandStorageClass::size()
 {
   if (file)
   {
@@ -119,9 +118,9 @@ unsigned long ESAT_TelemetryStorageClass::size()
   }
   else
   {
-    // If the telemetry store file isn't already open, just open it to
+    // If the telecommand store file isn't already open, just open it to
     // get its size and close it back to leave it as we found it.
-    file = SD.open(TELEMETRY_FILE, FILE_READ);
+    file = SD.open(TELECOMMAND_FILE, FILE_READ);
     if (!file)
     {
       error = true;
@@ -136,9 +135,9 @@ unsigned long ESAT_TelemetryStorageClass::size()
   }
 }
 
-void ESAT_TelemetryStorageClass::write(ESAT_CCSDSPacket& packet)
+void ESAT_TelecommandStorageClass::write(ESAT_CCSDSPacket& packet)
 {
-  // We cannot write telemetry packets to the telemetry archive while
+  // We cannot write telecommand packets to the telecommand archive while
   // we are reading it.
   if (readingInProgress)
   {
@@ -149,11 +148,11 @@ void ESAT_TelemetryStorageClass::write(ESAT_CCSDSPacket& packet)
   {
     return;
   }
-  // We open and close the telemetry archive every time we write a new
+  // We open and close the telecommand archive every time we write a new
   // packet.  This is simpler than tracking the state of the file from
   // call to call.
   // A failure to open the file is a hardware error.
-  file = SD.open(TELEMETRY_FILE, FILE_APPEND);
+  file = SD.open(TELECOMMAND_FILE, FILE_APPEND);
   if (!file)
   {
     error = true;
@@ -175,4 +174,4 @@ void ESAT_TelemetryStorageClass::write(ESAT_CCSDSPacket& packet)
   file.close();
 }
 
-ESAT_TelemetryStorageClass ESAT_TelemetryStorage;
+ESAT_TelecommandStorageClass ESAT_TelecommandStorage;

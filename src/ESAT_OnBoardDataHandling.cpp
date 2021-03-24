@@ -36,7 +36,7 @@ void ESAT_OnBoardDataHandlingClass::disableUSBTelemetry()
   usbWriter = ESAT_CCSDSPacketToKISSFrameWriter();
 }
 
-void ESAT_OnBoardDataHandlingClass::dispatchTelecommand(ESAT_CCSDSPacket& packet)
+void ESAT_OnBoardDataHandlingClass::dispatchTelecommand(ESAT_CCSDSPacket &packet)
 {
   // Send the telecommand packet to the first subsystem that matches
   // its application process identifier.  No two subsystems should
@@ -48,20 +48,57 @@ void ESAT_OnBoardDataHandlingClass::dispatchTelecommand(ESAT_CCSDSPacket& packet
   {
     return;
   }
-  for (ESAT_Subsystem* subsystem = firstSubsystem;
-       subsystem != nullptr;
-       subsystem = subsystem->nextSubsystem)
+  const ESAT_CCSDSSecondaryHeader saveSecondaryHeader = packet.readSecondaryHeader();
+  const bool isActive = packet.readBoolean();
+  if (isActive)
   {
-    const word subsystemsApplicationProcessIdentifier =
-      subsystem->getApplicationProcessIdentifier();
-    if (subsystemsApplicationProcessIdentifier
-        == primaryHeader.applicationProcessIdentifier)
+    ESAT_TelecommandStorage.write(packet);
+  }
+  else
+  {
+    for (ESAT_Subsystem *subsystem = firstSubsystem;
+         subsystem != nullptr;
+         subsystem = subsystem->nextSubsystem)
     {
-      subsystem->handleTelecommand(packet);
-      return;
+      const word subsystemsApplicationProcessIdentifier =
+          subsystem->getApplicationProcessIdentifier();
+      if (subsystemsApplicationProcessIdentifier == primaryHeader.applicationProcessIdentifier)
+      {
+        subsystem->handleTelecommand(packet);
+        return;
+      }
     }
   }
 }
+
+void ESAT_OnBoardDataHandlingClass::dispatchProgrammedTelecommand()
+{
+  const word bufferLength = 256;
+  byte buffer[bufferLength];
+  ESAT_CCSDSPacket datum(buffer, bufferLength);
+  ESAT_TelecommandStorage.beginReading();
+  if (ESAT_TelecommandStorage.read(datum))
+  {
+    datum.rewind();
+    const ESAT_CCSDSPrimaryHeader primaryHeader = datum.readPrimaryHeader();
+    for (ESAT_Subsystem *subsystem = firstSubsystem;
+        subsystem != nullptr;
+        subsystem = subsystem->nextSubsystem)
+    {
+      const word subsystemsApplicationProcessIdentifier =
+          subsystem->getApplicationProcessIdentifier();
+      if (subsystemsApplicationProcessIdentifier == primaryHeader.applicationProcessIdentifier)
+      {
+        subsystem->handleTelecommand(datum);
+        ESAT_TelecommandStorage.erase();
+        return;
+      }
+    }
+  }
+  ESAT_TelecommandStorage.endReading();
+}
+
+
 
 void ESAT_OnBoardDataHandlingClass::enableUSBTelecommands(byte buffer[],
                                                           const unsigned long bufferLength)
@@ -83,7 +120,7 @@ void ESAT_OnBoardDataHandlingClass::enableUSBTelemetry()
   usbWriter = ESAT_CCSDSPacketToKISSFrameWriter(Serial);
 }
 
-boolean ESAT_OnBoardDataHandlingClass::readTelecommand(ESAT_CCSDSPacket& packet)
+boolean ESAT_OnBoardDataHandlingClass::readTelecommand(ESAT_CCSDSPacket &packet)
 {
   // Subsystems are visited in a first-in, first-out basis, from the
   // first subsystem to the last subsystem.
@@ -101,7 +138,7 @@ boolean ESAT_OnBoardDataHandlingClass::readTelecommand(ESAT_CCSDSPacket& packet)
   while (telecommandSubsystem != nullptr)
   {
     const boolean gotTelecommand =
-      readTelecommandFromSubsystem(packet, *telecommandSubsystem);
+        readTelecommandFromSubsystem(packet, *telecommandSubsystem);
     if (gotTelecommand)
     {
       return true;
@@ -114,8 +151,8 @@ boolean ESAT_OnBoardDataHandlingClass::readTelecommand(ESAT_CCSDSPacket& packet)
   return readTelecommandFromUSB(packet);
 }
 
-boolean ESAT_OnBoardDataHandlingClass::readTelecommandFromSubsystem(ESAT_CCSDSPacket& packet,
-                                                                    ESAT_Subsystem& subsystem)
+boolean ESAT_OnBoardDataHandlingClass::readTelecommandFromSubsystem(ESAT_CCSDSPacket &packet,
+                                                                    ESAT_Subsystem &subsystem)
 {
   packet.flush();
   const boolean gotPacket = subsystem.readTelecommand(packet);
@@ -131,7 +168,7 @@ boolean ESAT_OnBoardDataHandlingClass::readTelecommandFromSubsystem(ESAT_CCSDSPa
   }
 }
 
-boolean ESAT_OnBoardDataHandlingClass::readTelecommandFromUSB(ESAT_CCSDSPacket& packet)
+boolean ESAT_OnBoardDataHandlingClass::readTelecommandFromUSB(ESAT_CCSDSPacket &packet)
 {
   packet.flush();
   const boolean gotPacket = usbReader.read(packet);
@@ -147,8 +184,8 @@ boolean ESAT_OnBoardDataHandlingClass::readTelecommandFromUSB(ESAT_CCSDSPacket& 
   }
 }
 
-boolean ESAT_OnBoardDataHandlingClass::readTelemetryFromSubsystem(ESAT_CCSDSPacket& packet,
-                                                                  ESAT_Subsystem& subsystem)
+boolean ESAT_OnBoardDataHandlingClass::readTelemetryFromSubsystem(ESAT_CCSDSPacket &packet,
+                                                                  ESAT_Subsystem &subsystem)
 {
   packet.flush();
   const boolean gotPacket = subsystem.readTelemetry(packet);
@@ -164,7 +201,7 @@ boolean ESAT_OnBoardDataHandlingClass::readTelemetryFromSubsystem(ESAT_CCSDSPack
   }
 }
 
-boolean ESAT_OnBoardDataHandlingClass::readSubsystemsTelemetry(ESAT_CCSDSPacket& packet)
+boolean ESAT_OnBoardDataHandlingClass::readSubsystemsTelemetry(ESAT_CCSDSPacket &packet)
 {
   // Subsystems are visited in a first-in, first-out basis, from the
   // first subsystem to the last subsystem.
@@ -179,7 +216,7 @@ boolean ESAT_OnBoardDataHandlingClass::readSubsystemsTelemetry(ESAT_CCSDSPacket&
   while (telemetrySubsystem != nullptr)
   {
     const boolean gotTelemetry =
-      readTelemetryFromSubsystem(packet, *telemetrySubsystem);
+        readTelemetryFromSubsystem(packet, *telemetrySubsystem);
     if (gotTelemetry)
     {
       return true;
@@ -192,7 +229,7 @@ boolean ESAT_OnBoardDataHandlingClass::readSubsystemsTelemetry(ESAT_CCSDSPacket&
   return false;
 }
 
-void ESAT_OnBoardDataHandlingClass::registerSubsystem(ESAT_Subsystem& subsystem)
+void ESAT_OnBoardDataHandlingClass::registerSubsystem(ESAT_Subsystem &subsystem)
 {
   // Subsystems are appended to the end of the list so that it is easy
   // to visit them in a first-in, first-out basis.
@@ -219,7 +256,7 @@ void ESAT_OnBoardDataHandlingClass::updateSubsystems()
   // and readTelemetry() are assigned to the first subsystem so that
   // the next series of calls to those methods can work from the
   // start of the list.
-  for (ESAT_Subsystem* subsystem = firstSubsystem;
+  for (ESAT_Subsystem *subsystem = firstSubsystem;
        subsystem != nullptr;
        subsystem = subsystem->nextSubsystem)
   {
@@ -229,7 +266,7 @@ void ESAT_OnBoardDataHandlingClass::updateSubsystems()
   telemetrySubsystem = firstSubsystem;
 }
 
-void ESAT_OnBoardDataHandlingClass::writeTelemetry(ESAT_CCSDSPacket& packet)
+void ESAT_OnBoardDataHandlingClass::writeTelemetry(ESAT_CCSDSPacket &packet)
 {
   // The telemetry packe is written to the subsystems and to the USB
   // packet writer.  The packet is passed to the subsystems as a
@@ -243,14 +280,14 @@ void ESAT_OnBoardDataHandlingClass::writeTelemetry(ESAT_CCSDSPacket& packet)
   {
     return;
   }
-  for (ESAT_Subsystem* subsystem = firstSubsystem;
+  for (ESAT_Subsystem *subsystem = firstSubsystem;
        subsystem != nullptr;
        subsystem = subsystem->nextSubsystem)
   {
     packet.rewind();
     subsystem->writeTelemetry(packet);
   }
-  (void) usbWriter.unbufferedWrite(packet);
+  (void)usbWriter.unbufferedWrite(packet);
 }
 
 ESAT_OnBoardDataHandlingClass ESAT_OnBoardDataHandling;

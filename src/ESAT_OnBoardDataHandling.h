@@ -35,6 +35,7 @@
 #include "ESAT_OBC-hardware/ESAT_OBCClock.h"
 #include "ESAT_OBC-hardware/ESAT_OBCLED.h"
 #include "ESAT_OBC-hardware/ESAT_TelemetryStorage.h"
+#include "ESAT_OBC-hardware/ESAT_TelecommandStorage.h"
 #include "ESAT_OBC-subsystems/ESAT_ADCSSubsystem.h"
 #include "ESAT_OBC-subsystems/ESAT_EPSSubsystem.h"
 #include "ESAT_OBC-subsystems/ESAT_OBCSubsystem.h"
@@ -76,6 +77,9 @@ class ESAT_OnBoardDataHandlingClass
 
     // Dispatch a command on the registered subsystems.
     void dispatchTelecommand(ESAT_CCSDSPacket& packet);
+
+    void dispatchProgrammedTelecommand();
+
 
     // Enable reception of telecommands from the USB interface.  Use
     // the buffer for accumulating the partially-received telecommands
