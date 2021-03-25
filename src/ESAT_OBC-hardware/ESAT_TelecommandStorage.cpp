@@ -26,6 +26,7 @@
 // The filename of the telecommand archive cannot exceed 8 characters
 // due to filesystem limitations.
 const char ESAT_TelecommandStorageClass::TELECOMMAND_FILE[] = "tlcmd_db";
+const char ESAT_TelecommandStorageClass::UPDATED_FILE[] = "updt_db";
 
 void ESAT_TelecommandStorageClass::beginReading()
 {
@@ -35,7 +36,9 @@ void ESAT_TelecommandStorageClass::beginReading()
   {
     file.close();
   }
+
   file = SD.open(TELECOMMAND_FILE, FILE_READ);
+
   readingInProgress = true;
 }
 
@@ -53,14 +56,14 @@ void ESAT_TelecommandStorageClass::erase()
   // Erasing the stored telecommand is as simple as removing the
   // telecommand archive.
   // A failure to remove the telecommand archive is a hardware error.
-  const boolean correctRemoval = SD.remove((char*) TELECOMMAND_FILE);
+  const boolean correctRemoval = SD.remove((char *)TELECOMMAND_FILE);
   if (!correctRemoval)
   {
     error = true;
   }
 }
 
-boolean ESAT_TelecommandStorageClass::read(ESAT_CCSDSPacket& packet)
+boolean ESAT_TelecommandStorageClass::read(ESAT_CCSDSPacket &packet)
 {
   // If we didn't call beginReading(), we aren't ready to read
   // telecommand, but this in itself isn't a hardware error, so we don't
@@ -79,9 +82,11 @@ boolean ESAT_TelecommandStorageClass::read(ESAT_CCSDSPacket& packet)
   // Instead of naked packets, we store them in KISS frames, so
   // we must extract packets from frames.
   const unsigned long bufferLength =
-    ESAT_CCSDSPrimaryHeader::LENGTH + packet.capacity();
+      ESAT_CCSDSPrimaryHeader::LENGTH + packet.capacity();
   byte buffer[bufferLength];
+
   ESAT_CCSDSPacketFromKISSFrameReader reader(file, buffer, bufferLength);
+
   while (file.available() > 0)
   {
     const boolean correctPacket = reader.read(packet);
@@ -91,19 +96,77 @@ boolean ESAT_TelecommandStorageClass::read(ESAT_CCSDSPacket& packet)
       return false;
     }
     packet.rewind();
+
     const ESAT_CCSDSSecondaryHeader secondaryHeader =
-      packet.readSecondaryHeader();
+        packet.readSecondaryHeader();
     const bool isProgrammed = packet.readBoolean();
     const ESAT_Timestamp timestamp = packet.readTimestamp();
     const ESAT_Timestamp currentTime = ESAT_OBCClock.read();
+
     packet.rewind();
     if (isProgrammed && (timestamp < currentTime))
     {
+      //updateBuffer(secondaryHeader);
       return true;
     }
   }
   return false;
 }
+
+
+
+
+void ESAT_TelecommandStorageClass::updateBuffer(ESAT_CCSDSPacket packet)
+{
+  packet.rewind();
+  const ESAT_CCSDSPrimaryHeader primaryHeader = packet.readPrimaryHeader();
+  const ESAT_CCSDSSecondaryHeader secondaryHeader =
+        packet.readSecondaryHeader();
+  const bool isProgrammed = packet.readBoolean();
+  const ESAT_Timestamp timestamp = packet.readTimestamp();
+  packet.rewind();
+  updatedFile = SD.open(UPDATED_FILE, FILE_APPEND);
+  const word bufferLength = 256;
+  byte buffer[bufferLength];
+  ESAT_CCSDSPacket datum = packet;
+  endReading();
+  beginReading();
+  ESAT_CCSDSPacketFromKISSFrameReader reader(file, buffer, bufferLength);
+  while (file.available() > 0)
+  {
+    const boolean correctPacket = reader.read(datum);
+    datum.rewind();
+    const ESAT_CCSDSPrimaryHeader updatedPrimaryHeader = datum.readPrimaryHeader();
+    const ESAT_CCSDSSecondaryHeader updatedSecondaryHeader = datum.readSecondaryHeader();
+    const bool updatedIsProgrammed = datum.readBoolean();
+    const ESAT_Timestamp updatedTimestamp = datum.readTimestamp();
+    datum.rewind();
+    if (timestamp != updatedTimestamp)
+    {
+      ESAT_CCSDSPacketToKISSFrameWriter writer(updatedFile);
+      const boolean correctWrite = writer.unbufferedWrite(datum);
+    }
+  }
+  endReading();
+  erase();
+  updatedFile.close();
+
+  updatedFile = SD.open(UPDATED_FILE, FILE_READ);
+  ESAT_CCSDSPacketFromKISSFrameReader updatedReader(updatedFile, buffer, bufferLength);
+
+  while (updatedFile.available() > 0)
+  {
+    const boolean correctPacket = updatedReader.read(datum);
+    datum.rewind();
+    write(datum);
+  }
+  updatedFile.close();
+  const boolean correctRemoval = SD.remove((char *)UPDATED_FILE);
+}
+
+
+
+
 
 boolean ESAT_TelecommandStorageClass::reading() const
 {
@@ -135,7 +198,7 @@ unsigned long ESAT_TelecommandStorageClass::size()
   }
 }
 
-void ESAT_TelecommandStorageClass::write(ESAT_CCSDSPacket& packet)
+void ESAT_TelecommandStorageClass::write(ESAT_CCSDSPacket &packet)
 {
   // We cannot write telecommand packets to the telecommand archive while
   // we are reading it.
@@ -167,7 +230,7 @@ void ESAT_TelecommandStorageClass::write(ESAT_CCSDSPacket& packet)
   // data loss to the affected packet.
   ESAT_CCSDSPacketToKISSFrameWriter writer(file);
   const boolean correctWrite = writer.unbufferedWrite(packet);
-  if (!correctWrite) 
+  if (!correctWrite)
   {
     error = true;
   }

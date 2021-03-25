@@ -90,7 +90,7 @@ void ESAT_OnBoardDataHandlingClass::dispatchProgrammedTelecommand()
       if (subsystemsApplicationProcessIdentifier == primaryHeader.applicationProcessIdentifier)
       {
         subsystem->handleTelecommand(datum);
-        ESAT_TelecommandStorage.erase();
+        ESAT_TelecommandStorage.updateBuffer(datum);
         return;
       }
     }

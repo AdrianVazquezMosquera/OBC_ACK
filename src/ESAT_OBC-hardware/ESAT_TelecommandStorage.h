@@ -71,9 +71,12 @@ class ESAT_TelecommandStorageClass
     // reading, which happens between beginReading() and endReading().
     void write(ESAT_CCSDSPacket& packet);
 
+    void updateBuffer(ESAT_CCSDSPacket packet);
+
   private:
     // Store telemetry in this file.
     static const char TELECOMMAND_FILE[];
+    static const char UPDATED_FILE[];
 
     // Read telemetry generated at this timestamp or after this
     // timestamp.
@@ -85,10 +88,12 @@ class ESAT_TelecommandStorageClass
 
     // Store telemetry in this file.
     File file;
+    File updatedFile;
 
     // Set to true between beginReading() and endReading();
     // false the rest of the time.
     boolean readingInProgress = false;
+
 };
 
 // Global instance of the telemetry storage library.
